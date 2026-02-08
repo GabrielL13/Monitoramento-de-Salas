@@ -1,8 +1,8 @@
-import { db, ref, set, get, remove } from "./firebase.js";
-
 const form = document.getElementById("form-usuario");
 const mensagem = document.getElementById("mensagem");
+const API_URL = "http://localhost:3000";
 
+// --- CADASTRO DE USUÁRIO ---
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -10,82 +10,61 @@ form.addEventListener("submit", async (e) => {
   const nome = document.getElementById("nomeUsuario").value.trim();
   const email = document.getElementById("emailUsuario").value.trim();
   const senha = document.getElementById("senhaUsuario").value.trim();
-  const tipo = document.getElementById("tipoUsuario").value.trim();
+  const tipo = document.getElementById("tipoUsuario").value; // 0 ou 1
 
-  if (!matricula || !nome || !email || !senha || !tipo) {
+  if (!matricula || !nome || !email || !senha) {
     mensagem.textContent = "Preencha todos os campos.";
     mensagem.style.color = "orange";
     return;
   }
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    mensagem.textContent = "E-mail inválido.";
-    mensagem.style.color = "red";
-    return;
-  }
-
   try {
-    const userRef = ref(db, "User/" + matricula);
-    const snap = await get(userRef);
-
-    if (snap.exists()) {
-      mensagem.textContent = `A matrícula "${matricula}" já está cadastrada.`;
-      mensagem.style.color = "red";
-      return;
-    }
-
-    const allUsersSnap = await get(ref(db, "User"));
-    if (allUsersSnap.exists()) {
-      const users = allUsersSnap.val();
-      for (const id in users) {
-        if (users[id].email === email) {
-          mensagem.textContent = "E-mail já cadastrado.";
-          mensagem.style.color = "red";
-          return;
-        }
-      }
-    }
-
-    await set(ref(db, "User/" + matricula), {
-      nome,
-      email,
-      senha,
-      tipo
+    const response = await fetch(`${API_URL}/usuarios`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        matricula,
+        nome,
+        email,
+        senha, // No banco chamamos de 'senha'
+        tipo: Number(tipo)
+      })
     });
 
-    mensagem.textContent = "Usuário cadastrado com sucesso!";
-    mensagem.style.color = "lightgreen";
-    form.reset();
+    const data = await response.json();
+
+    if (response.ok) {
+      mensagem.textContent = "Usuário cadastrado com sucesso!";
+      mensagem.style.color = "lightgreen";
+      form.reset();
+    } else {
+      mensagem.textContent = data.message || "Erro ao cadastrar usuário.";
+      mensagem.style.color = "red";
+    }
   } catch (err) {
-    mensagem.textContent = "Erro ao cadastrar. Tente novamente.";
+    mensagem.textContent = "Erro ao conectar ao servidor.";
     mensagem.style.color = "red";
   }
 });
 
+// --- LÓGICA DO MODAL DE EXCLUSÃO ---
 const btnOpen = document.getElementById("btnOpenModal");
 const btnCancel = document.getElementById("btnCancelModal");
 const modal = document.getElementById("modalExclusao");
 const btnConfirm = document.getElementById("btnConfirmDelete");
 const inputMatricula = document.getElementById("matriculaDelete");
 
-btnOpen.addEventListener("click", () => {
+btnOpen.onclick = () => {
   modal.style.display = "flex";
   inputMatricula.focus();
-});
+};
 
-btnCancel.addEventListener("click", () => {
+btnCancel.onclick = () => {
   modal.style.display = "none";
   inputMatricula.value = "";
-});
+};
 
-window.addEventListener("click", (e) => {
-  if (e.target === modal) {
-    modal.style.display = "none";
-  }
-});
-
-btnConfirm.addEventListener("click", async () => {
+btnConfirm.onclick = async () => {
   const matricula = inputMatricula.value.trim();
 
   if (!matricula) {
@@ -93,17 +72,20 @@ btnConfirm.addEventListener("click", async () => {
     return;
   }
 
-  const userRef = ref(db, "User/" + matricula);
-  const snap = await get(userRef);
+  try {
+    const response = await fetch(`${API_URL}/usuarios/${matricula}`, {
+      method: 'DELETE'
+    });
 
-  if (!snap.exists()) {
-    alert("Matrícula não encontrada.");
-    return;
+    if (response.ok) {
+      alert("Usuário removido com sucesso.");
+      modal.style.display = "none";
+      inputMatricula.value = "";
+    } else {
+      const data = await response.json();
+      alert(data.message || "Erro ao remover usuário.");
+    }
+  } catch (err) {
+    alert("Erro ao conectar ao servidor.");
   }
-
-  await remove(userRef);
-  alert("Usuário removido com sucesso.");
-
-  modal.style.display = "none";
-  inputMatricula.value = "";
-});
+};

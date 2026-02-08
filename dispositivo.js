@@ -1,63 +1,70 @@
-import { db, ref, set, get, push } from "./firebase.js";
-
 const form = document.getElementById("form-dispositivo");
 const mensagem = document.getElementById("mensagem");
 
+const API_URL = "http://localhost:3000";
+
 form.addEventListener("submit", async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  const id = document.getElementById("idSala").value.trim();
-  const nome = document.getElementById("nomeSala").value.trim();
+    const id = document.getElementById("idSala").value.trim();
+    const nome = document.getElementById("nomeSala").value.trim();
 
-  if (!id || !nome) {
-    mensagem.textContent = "Preencha todos os campos.";
-    mensagem.style.color = "orange";
-    return;
-  }
-
-  try {
-    const dispositivoRef = ref(db, `Dispositivos/${id}`);
-
-    const snapshot = await get(dispositivoRef);
-    if (snapshot.exists()) {
-      mensagem.textContent = `Já existe uma sala com o ID "${id}".`;
-      mensagem.style.color = "red";
-      return;
+    if (!id || !nome) {
+        mensagem.textContent = "Preencha todos os campos.";
+        mensagem.style.color = "orange";
+        return;
     }
 
-    const dataHora = new Date().toLocaleString("pt-BR");
+    try {
+        // Criamos o objeto seguindo o Schema que definimos no inicializando.js
+        const dataHoraAtual = new Date().toLocaleString("pt-BR");
+        
+        const novoDispositivo = {
+            identificador: id,
+            nome: nome,
+            ar: {
+                estado: false, // Usando booleanos como no novo banco
+                temperatura: 21,
+                temperatura_flag: false
+            },
+            luz: {
+                estado: false
+            },
+            registros: {
+                ar: [
+                    { indice: 1, dataHora: dataHoraAtual, estado: false }
+                ]
+            }
+        };
 
-    const dados = {
-      nome,
-      ar: {
-        estado: 0,
-        temperatura: -1,
-        temperatura_flag: 0
-      },
-      luz: {
-        estado: 0
-      },
-      registros: {
-        ar: {},
-        luz: {}
-      }
-    };
+        const response = await fetch(`${API_URL}/dispositivos`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(novoDispositivo)
+        });
 
-    await set(dispositivoRef, dados);
+        const data = await response.json();
 
-    const registrosArRef = ref(db, `Dispositivos/${id}/registros/ar`);
-    const registrosLuzRef = ref(db, `Dispositivos/${id}/registros/luz`);
+        if (response.ok) {
+            mensagem.textContent = `Sala "${nome}" cadastrada com sucesso!`;
+            mensagem.style.color = "lightgreen";
+            form.reset();
+            
+            // Redireciona após 2 segundos para a tabela
+            setTimeout(() => {
+                window.location.href = "monitoramento.html";
+            }, 2000);
+        } else {
+            // Se o servidor retornar erro (ex: ID já existe)
+            mensagem.textContent = data.message || "Erro ao cadastrar sala.";
+            mensagem.style.color = "red";
+        }
 
-    await push(registrosArRef, { dataHora, estado: 0, temperatura: -1 });
-    await push(registrosLuzRef, { dataHora, estado: 0 });
-
-    mensagem.textContent = `Sala "${nome}" cadastrada com sucesso!`;
-    mensagem.style.color = "lightgreen";
-    form.reset();
-
-  } catch (error) {
-    console.error("Erro ao cadastrar sala:", error);
-    mensagem.textContent = "Erro ao cadastrar. Tente novamente.";
-    mensagem.style.color = "red";
-  }
+    } catch (error) {
+        console.error("Erro ao cadastrar sala:", error);
+        mensagem.textContent = "Não foi possível conectar ao servidor.";
+        mensagem.style.color = "red";
+    }
 });
