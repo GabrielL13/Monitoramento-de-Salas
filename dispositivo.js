@@ -16,14 +16,13 @@ form.addEventListener("submit", async (e) => {
     }
 
     try {
-        // Criamos o objeto seguindo o Schema que definimos no inicializando.js
         const dataHoraAtual = new Date().toLocaleString("pt-BR");
         
         const novoDispositivo = {
             identificador: id,
             nome: nome,
             ar: {
-                estado: false, // Usando booleanos como no novo banco
+                estado: false,
                 temperatura: 21,
                 temperatura_flag: false
             },
@@ -52,12 +51,10 @@ form.addEventListener("submit", async (e) => {
             mensagem.style.color = "lightgreen";
             form.reset();
             
-            // Redireciona após 2 segundos para a tabela
             setTimeout(() => {
                 window.location.href = "monitoramento.html";
             }, 2000);
         } else {
-            // Se o servidor retornar erro (ex: ID já existe)
             mensagem.textContent = data.message || "Erro ao cadastrar sala.";
             mensagem.style.color = "red";
         }

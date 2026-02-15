@@ -2,7 +2,6 @@ const form = document.getElementById("form-usuario");
 const mensagem = document.getElementById("mensagem");
 const API_URL = "http://localhost:3000";
 
-// --- CADASTRO DE USUÁRIO ---
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
@@ -26,13 +25,12 @@ form.addEventListener("submit", async (e) => {
         matricula,
         nome,
         email,
-        senha, // No banco chamamos de 'senha'
+        senha,
         tipo: Number(tipo)
       })
     });
 
     const data = await response.json();
-
     if (response.ok) {
       mensagem.textContent = "Usuário cadastrado com sucesso!";
       mensagem.style.color = "lightgreen";
@@ -47,7 +45,6 @@ form.addEventListener("submit", async (e) => {
   }
 });
 
-// --- LÓGICA DO MODAL DE EXCLUSÃO ---
 const btnOpen = document.getElementById("btnOpenModal");
 const btnCancel = document.getElementById("btnCancelModal");
 const modal = document.getElementById("modalExclusao");
