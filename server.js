@@ -6,6 +6,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+
 // --- CONEXÃO COM MONGODB ATLAS ---
 const ATLAS_URI = "mongodb+srv://gabriel_db_user:LKGSHxBeyw58K36g@monitoramentodispositiv.gdoyn3l.mongodb.net/?appName=MonitoramentoDispositivos";
 mongoose.connect(ATLAS_URI)
@@ -170,4 +171,5 @@ app.patch('/dispositivos/:id/temperatura', async (req, res) => {
     }
 });
 
-app.listen(3000, () => console.log("🚀 API rodando em http://localhost:3000"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 API rodando na porta ${PORT}`));
