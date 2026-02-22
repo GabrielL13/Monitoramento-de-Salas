@@ -8,7 +8,7 @@ app.use(cors());
 
 
 // --- CONEXÃO COM MONGODB ATLAS ---
-const ATLAS_URI = "mongodb+srv://gabriel_db_user:LKGSHxBeyw58K36g@monitoramentodispositiv.gdoyn3l.mongodb.net/?appName=MonitoramentoDispositivos";
+const ATLAS_URI = process.env.MONGODB_URI;
 mongoose.connect(ATLAS_URI)
     .then(() => console.log("✅ Servidor conectado ao MongoDB Atlas"))
     .catch(err => console.error("❌ Erro de conexão:", err));
