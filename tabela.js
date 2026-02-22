@@ -3,7 +3,7 @@ const adminButtons = document.getElementById("adminButtons");
 const thDeletar = document.getElementById("th-deletar");
 const logoutBtn = document.getElementById("logout-btn");
 
-const API_URL = "http://localhost:3000";
+const API_URL = "https://monitoramento-de-salas.onrender.com";
 const tipoUsuario = localStorage.getItem("tipoUsuario");
 
 if (tipoUsuario === "1") {

@@ -1,5 +1,5 @@
 const id = localStorage.getItem("dispositivoIdParaRegistro");
-const API_URL = "http://localhost:3000";
+const API_URL = "https://monitoramento-de-salas.onrender.com";
 
 const popupPower = document.getElementById("popupPower");
 const popupTemp = document.getElementById("popupTemperatura");
