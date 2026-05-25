@@ -6,13 +6,15 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-
 // --- CONEXÃO COM MONGODB ATLAS ---
 const ATLAS_URI = process.env.MONGODB_URI;
 mongoose.connect(ATLAS_URI)
     .then(() => console.log("✅ Servidor conectado ao MongoDB Atlas"))
     .catch(err => console.error("❌ Erro de conexão:", err));
 
+// --- MODELOS ---
+
+// Mantido exatamente como o seu original, conforme solicitado
 const User = mongoose.model('User', new mongoose.Schema({
     matricula: { type: String, required: true, unique: true },
     email: String,
@@ -20,16 +22,30 @@ const User = mongoose.model('User', new mongoose.Schema({
     tipo: Number
 }));
 
-const Dispositivo = mongoose.model('Dispositivo', new mongoose.Schema({
-    identificador: { type: String, required: true, unique: true },
-    nome: String,
-    ar: { estado: Boolean, temperatura: Number, temperatura_flag: Boolean },
-    luz: { estado: Boolean },
-    registros: {
-        ar: [{ dataHora: String, estado: Boolean, temperatura: Number }],
-        luz: [{ dataHora: String, estado: Boolean }]
-    }
-}));
+// Coleção principal: Status em tempo real e Comandos
+const DeviceStatus = mongoose.model('DeviceStatus', new mongoose.Schema({
+    device_id: { type: String, required: true, unique: true },
+    name: String,
+    relay_status: Boolean,
+    temperature: Number,
+    ac_command: Number,
+    ac_command_response: Number,
+    relay_command: Boolean,
+    relay_command_response: Boolean
+}, { collection: 'device_status' }));
+
+// Coleção de Logs (Apenas leitura no servidor Web, escritos pela ESP)
+const PresenceLog = mongoose.model('PresenceLog', new mongoose.Schema({
+    device_id: String,
+    event: String,
+    timestamp: String
+}, { collection: 'presence_logs' }));
+
+const TemperatureLog = mongoose.model('TemperatureLog', new mongoose.Schema({
+    device_id: String,
+    temperature: Number,
+    timestamp: String
+}, { collection: 'temperature_logs' }));
 
 // --- ROTAS DE USUÁRIO ---
 
@@ -77,7 +93,7 @@ app.delete('/usuarios/:matricula', async (req, res) => {
 
 app.get('/dispositivos', async (req, res) => {
     try {
-        const dispositivos = await Dispositivo.find();
+        const dispositivos = await DeviceStatus.find();
         res.json(dispositivos);
     } catch (err) {
         res.status(500).json({ message: "Erro ao buscar dispositivos." });
@@ -86,7 +102,7 @@ app.get('/dispositivos', async (req, res) => {
 
 app.get('/dispositivos/:id', async (req, res) => {
     try {
-        const disp = await Dispositivo.findOne({ identificador: req.params.id });
+        const disp = await DeviceStatus.findOne({ device_id: req.params.id });
         if (!disp) return res.status(404).json({ message: "Sala não encontrada" });
         res.json(disp);
     } catch (err) {
@@ -96,60 +112,56 @@ app.get('/dispositivos/:id', async (req, res) => {
 
 app.post('/dispositivos', async (req, res) => {
     try {
-        const { identificador } = req.body;
-        const existe = await Dispositivo.findOne({ identificador });
+        const { device_id } = req.body;
+        const existe = await DeviceStatus.findOne({ device_id });
         if (existe) return res.status(400).json({ message: "ID já existe." });
 
-        const novo = new Dispositivo(req.body);
+        const novo = new DeviceStatus(req.body);
         await novo.save();
         res.status(201).json(novo);
     } catch (err) {
-        res.status(500).json({ message: "Erro ao salvar dispositivo." });
+        // Mudança aqui: Retornamos o err.message verdadeiro para o front-end
+        console.error("ERRO NO MONGO:", err); 
+        res.status(500).json({ message: `Erro do Banco: ${err.message}` });
     }
 });
 
 app.delete('/dispositivos/:id', async (req, res) => {
     try {
-        await Dispositivo.findOneAndDelete({ identificador: req.params.id });
+        await DeviceStatus.findOneAndDelete({ device_id: req.params.id });
+        
+        // Opcional: Se quiser que ao deletar a sala os logs também sumam, descomente abaixo
+        // await PresenceLog.deleteMany({ device_id: req.params.id });
+        // await TemperatureLog.deleteMany({ device_id: req.params.id });
+
         res.json({ message: "Deletado com sucesso" });
     } catch (err) {
         res.status(500).send(err);
     }
 });
 
-// --- ROTAS DE CONTROLE (REGISTROS) ---
+// --- ROTAS DE CONTROLE (SINALIZAÇÃO PARA A ESP) ---
 
 app.patch('/dispositivos/:id/ar', async (req, res) => {
     try {
-        const { estado } = req.body;
-        const dataHora = new Date().toLocaleString("pt-BR");
-        const disp = await Dispositivo.findOne({ identificador: req.params.id });
-
-        const atualizado = await Dispositivo.findOneAndUpdate(
-            { identificador: req.params.id },
-            { 
-                $set: { "ar.estado": estado },
-                $push: { "registros.ar": { dataHora, estado, temperatura: disp.ar.temperatura } }
-            },
+        const { comando } = req.body; 
+        const atualizado = await DeviceStatus.findOneAndUpdate(
+            { device_id: req.params.id },
+            { $set: { ac_command: comando } },
             { new: true }
         );
         res.json(atualizado);
     } catch (err) {
-        res.status(500).json({ message: "Erro ao atualizar Ar." });
+        res.status(500).json({ message: "Erro ao atualizar comando de Ar." });
     }
 });
 
 app.patch('/dispositivos/:id/luz', async (req, res) => {
     try {
-        const { estado } = req.body;
-        const dataHora = new Date().toLocaleString("pt-BR");
-
-        const atualizado = await Dispositivo.findOneAndUpdate(
-            { identificador: req.params.id },
-            { 
-                $set: { "luz.estado": estado },
-                $push: { "registros.luz": { dataHora, estado } }
-            },
+        const { estado } = req.body; 
+        const atualizado = await DeviceStatus.findOneAndUpdate(
+            { device_id: req.params.id },
+            { $set: { relay_command: estado } },
             { new: true }
         );
         res.json(atualizado);
@@ -161,13 +173,41 @@ app.patch('/dispositivos/:id/luz', async (req, res) => {
 app.patch('/dispositivos/:id/temperatura', async (req, res) => {
     try {
         const { temperatura } = req.body;
-        await Dispositivo.findOneAndUpdate(
-            { identificador: req.params.id },
-            { $set: { "ar.temperatura": temperatura, "ar.temperatura_flag": true } }
+        const atualizado = await DeviceStatus.findOneAndUpdate(
+            { device_id: req.params.id },
+            { $set: { ac_command: temperatura } }, 
+            { new: true }
         );
-        res.json({ message: "Temperatura atualizada" });
+        res.json({ message: "Comando de temperatura atualizado", data: atualizado });
     } catch (err) {
         res.status(500).json({ message: "Erro ao atualizar temperatura." });
+    }
+});
+
+// --- ROTAS DE BUSCA DE LOGS ---
+
+// Buscar logs de Ar Condicionado (Temperatura)
+app.get('/dispositivos/:id/logs/ar', async (req, res) => {
+    try {
+        // Busca os logs do dispositivo, ordena do mais novo pro mais velho e limita aos últimos 30
+        const logs = await TemperatureLog.find({ device_id: req.params.id })
+                                         .sort({ _id: -1 })
+                                         .limit(30); 
+        res.json(logs);
+    } catch (err) {
+        res.status(500).json({ message: "Erro ao buscar logs de ar." });
+    }
+});
+
+// Buscar logs de Luz (Presença/Relé)
+app.get('/dispositivos/:id/logs/luz', async (req, res) => {
+    try {
+        const logs = await PresenceLog.find({ device_id: req.params.id })
+                                      .sort({ _id: -1 })
+                                      .limit(30);
+        res.json(logs);
+    } catch (err) {
+        res.status(500).json({ message: "Erro ao buscar logs de luz." });
     }
 });
 

@@ -16,24 +16,16 @@ form.addEventListener("submit", async (e) => {
     }
 
     try {
-        const dataHoraAtual = new Date().toLocaleString("pt-BR");
-        
+        // Objeto enxuto: Apenas os campos da coleção device_status
         const novoDispositivo = {
-            identificador: id,
-            nome: nome,
-            ar: {
-                estado: false,
-                temperatura: 21,
-                temperatura_flag: false
-            },
-            luz: {
-                estado: false
-            },
-            registros: {
-                ar: [
-                    { indice: 1, dataHora: dataHoraAtual, estado: false }
-                ]
-            }
+            device_id: id,
+            name: nome,
+            relay_status: false,
+            temperature: 21,
+            ac_command: 0,
+            ac_command_response: 0,
+            relay_command: false,
+            relay_command_response: false
         };
 
         const response = await fetch(`${API_URL}/dispositivos`, {
